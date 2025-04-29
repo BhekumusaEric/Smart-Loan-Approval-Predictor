@@ -23,7 +23,7 @@ for col in categorical_columns:
 
 # Label encoding for categorical columns
 label_encoders = {}
-categorical_columns = ['Gender', 'Married', 'Education', 'Self_Employed', 'Property_Area', 'Credit_History']
+categorical_columns = ['Gender', 'Married', 'Education', 'Self_Employed', 'Property_Area']
 for col in categorical_columns:
     le = LabelEncoder()
     df[col] = le.fit_transform(df[col].astype(str))
@@ -31,6 +31,9 @@ for col in categorical_columns:
 
 # Handle Dependents column (convert '3+' to 3)
 df['Dependents'] = pd.to_numeric(df['Dependents'].replace('3+', 3), errors='coerce').fillna(0).astype(int)
+
+# Ensure Credit_History is numeric (0 or 1)
+df['Credit_History'] = df['Credit_History'].fillna(1).astype(int)
 
 # Encode target variable Loan_Status
 le = LabelEncoder()
