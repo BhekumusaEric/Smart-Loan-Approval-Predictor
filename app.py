@@ -1,60 +1,46 @@
-
 import streamlit as st
-import pandas as pd
 import joblib
-import datetime
+import pandas as pd
+import numpy as np
 
-st.set_page_config(page_title="Loan Approval Predictor", layout="centered")
-
-# Load model and encoders
+# Load the pre-trained model and encoders
 model = joblib.load("loan_model.pkl")
 encoders = joblib.load("encoders.pkl")
 
-st.title("🏦 Smart Loan Approval Predictor")
+# Streamlit App Title
+st.title("Smart Loan Approval Predictor")
 
-st.markdown("Enter your information to see if your loan will likely be approved.")
+# Input fields for prediction
+st.header("Enter loan applicant details:")
 
-# Input form
-with st.form("loan_form"):
-    gender = st.selectbox("Gender", ["Male", "Female"])
-    married = st.selectbox("Married", ["Yes", "No"])
-    education = st.selectbox("Education", ["Graduate", "Not Graduate"])
-    self_employed = st.selectbox("Self Employed", ["Yes", "No"])
-    applicant_income = st.slider("Applicant Income", 0, 100000, 5000)
-    loan_amount = st.slider("Loan Amount", 0, 1000, 100)
-    credit_history = st.selectbox("Credit History", [1.0, 0.0])
-    property_area = st.selectbox("Property Area", ["Urban", "Semiurban", "Rural"])
+# Collect user inputs (make sure to match the order used in training)
+applicant_details = {}
 
-    submitted = st.form_submit_button("Check Loan Approval")
+applicant_details["Gender"] = st.selectbox("Gender", ["Male", "Female"])
+applicant_details["Married"] = st.selectbox("Marital Status", ["Married", "Single"])
+applicant_details["Dependents"] = st.number_input("Dependents", min_value=0, max_value=10, step=1)
+applicant_details["Education"] = st.selectbox("Education", ["Graduate", "Not Graduate"])
+applicant_details["Self_Employed"] = st.selectbox("Self Employed", ["Yes", "No"])
+applicant_details["ApplicantIncome"] = st.number_input("Applicant Income", min_value=1000, step=100)
+applicant_details["CoapplicantIncome"] = st.number_input("Coapplicant Income", min_value=0, step=100)
+applicant_details["LoanAmount"] = st.number_input("Loan Amount", min_value=100, step=100)
+applicant_details["Loan_Amount_Term"] = st.selectbox("Loan Amount Term", [360, 180, 120])
+applicant_details["Credit_History"] = st.selectbox("Credit History", [1, 0])
+applicant_details["Property_Area"] = st.selectbox("Property Area", ["Urban", "Semiurban", "Rural"])
 
-    if submitted:
-        try:
-            input_dict = {
-                'Gender': encoders['Gender'].transform([gender])[0],
-                'Married': encoders['Married'].transform([married])[0],
-                'Education': encoders['Education'].transform([education])[0],
-                'Self_Employed': encoders['Self_Employed'].transform([self_employed])[0],
-                'ApplicantIncome': applicant_income,
-                'LoanAmount': loan_amount,
-                'Credit_History': credit_history,
-                'Property_Area': encoders['Property_Area'].transform([property_area])[0],
-            }
+# Prepare the input data
+input_data = pd.DataFrame([applicant_details])
 
-            input_df = pd.DataFrame([input_dict])
+# Apply encoding using the saved encoders
+for col in ['Gender', 'Married', 'Education', 'Self_Employed', 'Property_Area']:
+    input_data[col] = encoders[col].transform(input_data[col])
 
-            prediction = model.predict(input_df)[0]
-            probability = model.predict_proba(input_df)[0][1]  # Confidence for approval
+# Make prediction using the trained model
+if st.button("Predict"):
+    prediction = model.predict(input_data)
+    
+    if prediction == 1:
+        st.success("Loan Approved!")
+    else:
+        st.error("Loan Denied!")
 
-            result = "✅ Approved" if prediction == 1 else "❌ Not Approved"
-            st.success(f"**Result:** {result}")
-            st.info(f"**Confidence:** {probability * 100:.2f}%")
-
-            # Logging
-            log = input_dict.copy()
-            log['Result'] = result
-            log['Confidence'] = round(probability * 100, 2)
-            log['Timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            pd.DataFrame([log]).to_csv("logs.csv", mode='a', index=False, header=not pd.io.common.file_exists("logs.csv"))
-
-        except Exception as e:
-            st.error("Something went wrong. Check your inputs or the model.")
